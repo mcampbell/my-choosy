@@ -114,7 +114,14 @@ ruby test/my_choosy_test.rb
 - **Log:** `~/Library/Logs/my-choosy.log`. The script writes one line for
   each link and each error.
 - **The app is not in the System Settings list:** run `bin/build --install`
-  again. It runs `lsregister -f`.
+  again. It runs `lsregister -f`. Then remove other registered copies of the
+  app, for example `build/my-choosy.app`:
+
+  ```sh
+  /System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister -u build/my-choosy.app
+  ```
+
+  Quit and open System Settings again.
 - **Check the signature:** `codesign --verify ~/Applications/my-choosy.app`.
   An edit to `Info.plist` breaks the signature. `bin/build` signs the app
   again.
