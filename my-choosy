@@ -6,8 +6,8 @@ require "fileutils"
 def load_config(path)
   rules = YAML.safe_load_file(path)
   ok = rules.is_a?(Array) && !rules.empty? && rules.all? do |r|
-    r.is_a?(Hash) && r["profile"].is_a?(String) &&
-      r["match"].is_a?(Array) && r["match"].all?(String)
+    r.is_a?(Hash) && r["profile"].is_a?(String) && !r["profile"].empty? &&
+      r["match"].is_a?(Array) && r["match"].all? { |f| f.is_a?(String) && !f.empty? }
   end
   raise "config must be a non-empty list of {profile: String, match: [String]}" unless ok
   rules

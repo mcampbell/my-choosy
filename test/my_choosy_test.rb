@@ -80,6 +80,20 @@ describe "load_config" do
       cfg(y) { |p| assert_raises(StandardError, y) { load_config(p) } }
     end
   end
+
+  it "raises on wrong types and malformed YAML" do
+    ["- profile: A\n  match: github\n", "- profile: 1\n  match: [a]\n",
+     "- profile: A\n  match: [1]\n", "- profile: [A\n"].each do |y|
+      cfg(y) { |p| assert_raises(StandardError, y) { load_config(p) } }
+    end
+  end
+
+  # An empty fragment would match every URL; an empty profile gives Chrome a bad flag.
+  it "raises on an empty profile or an empty fragment" do
+    ["- profile: \"\"\n  match: []\n", "- profile: A\n  match: [\"\"]\n"].each do |y|
+      cfg(y) { |p| assert_raises(StandardError, y) { load_config(p) } }
+    end
+  end
 end
 
 describe "launch_command" do
