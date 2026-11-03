@@ -3,7 +3,8 @@ require "tmpdir"
 
 # Never launch Chrome: capture system calls instead.
 $calls = []
-def system(*args) = ($calls << args) && true
+$system_ok = true
+def system(*args) = ($calls << args) && $system_ok
 
 load File.expand_path("../my-choosy", __dir__)
 
@@ -95,23 +96,26 @@ describe "launch_command" do
 end
 
 describe "main" do
-  def run_main(url, config)
+  def run_main(url, config, log_name: "logs/my-choosy.log")
     Dir.mktmpdir do |d|
       cp = "#{d}/cfg/config.yml"
+      lp = "#{d}/#{log_name}"
       if config
         Dir.mkdir("#{d}/cfg")
         File.write(cp, config)
       end
       calls = $calls.clear
       begin
-        main([url], config_path: cp, log_path: "#{d}/logs/my-choosy.log")
+        main([url], config_path: cp, log_path: lp)
       rescue SystemExit => e
         status = e.status
       end
-      log = File.exist?("#{d}/logs/my-choosy.log") ? File.read("#{d}/logs/my-choosy.log") : ""
+      log = File.file?(lp) ? File.read(lp) : ""
       yield calls, log, status
     end
   end
+
+  after { $system_ok = true }
 
   GOOD = "- profile: Default\n  match: []\n- profile: Profile 1\n  match: [github]\n"
 
@@ -137,6 +141,17 @@ describe "main" do
       assert_equal [launch_command(nil, "https://example.com/p?q=89")], calls
       assert_match(/ERROR .* https:\/\/example.com\/p\?q=89\n\z/, log)
     end
+  end
+
+  # The log path sits under a regular file, so the log write fails.
+  it "still opens the link when the log cannot be written" do
+    _, err = capture_io do
+      run_main("https://github.com/acme/r", GOOD, log_name: "cfg/config.yml/x.log") do |calls, _, status|
+        assert_nil status
+        assert_equal [launch_command("Profile 1", "https://github.com/acme/r")], calls
+      end
+    end
+    assert_match(/cannot write log/, err)
   end
 
   it "logs a missing config and still opens the link" do

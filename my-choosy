@@ -30,6 +30,8 @@ end
 def log_line(log_path, what, url)
   FileUtils.mkdir_p(File.dirname(log_path))
   File.open(log_path, "a") { |f| f.puts "#{Time.now.iso8601} #{what} #{url}" }
+rescue SystemCallError => e
+  warn "my-choosy: cannot write log: #{e.message}" # a log failure must not lose the link
 end
 
 def main(argv, config_path: File.expand_path("~/.config/my-choosy/config.yml"),
