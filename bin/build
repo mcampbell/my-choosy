@@ -54,6 +54,8 @@ PLIST=build/my-choosy.app/Contents/Info.plist
 plutil -replace CFBundleIdentifier -string local.my-choosy "$PLIST"
 plutil -replace CFBundleURLTypes -json '[{"CFBundleURLName":"Web URL","CFBundleURLSchemes":["http","https"]}]' "$PLIST"
 plutil -replace LSUIElement -bool true "$PLIST"
+# With URL types alone, System Settings did not list the app as a browser. Chrome also declares this.
+plutil -replace CFBundleDocumentTypes -json '[{"CFBundleTypeName":"HTML document","CFBundleTypeRole":"Viewer","LSItemContentTypes":["public.html","public.xhtml"]}]' "$PLIST"
 echo "4. Done"
 
 # 5. Sign
