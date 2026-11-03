@@ -44,7 +44,16 @@ describe "web_url?" do
   end
 
   it "rejects other schemes and empty input" do
-    ["file:///etc/hosts", "mailto:a@b.example", "javascript:alert(1)", "", nil].each do |u|
+    ["file:///etc/hosts", "mailto:a@b.example", "javascript:alert(1)", "", nil, "https://"].each do |u|
+      refute web_url?(u), u.inspect
+    end
+  end
+
+  # A raw newline or escape byte would forge or garble log lines.
+  it "rejects control characters and broken encoding" do
+    ["https://a.example\n2026-01-01T00:00:00+00:00 Profile 9 https://evil.example",
+     "https://a.example/\e[2J", "https://a.example/\t",
+     "https://a.example/\xFF".dup.force_encoding("UTF-8")].each do |u|
       refute web_url?(u), u.inspect
     end
   end

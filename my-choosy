@@ -19,7 +19,7 @@ def pick_profile(rules, url)
 end
 
 def web_url?(url)
-  url.to_s.match?(%r{\Ahttps?://}i)
+  url.is_a?(String) && url.valid_encoding? && url.match?(%r{\Ahttps?://[^[:cntrl:]]+\z}i)
 end
 
 def launch_command(profile, url)
