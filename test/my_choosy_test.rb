@@ -14,6 +14,8 @@ RULES = [
   { "profile" => "Profile 2", "match" => ["github.com/acme", "docs.google"] }
 ].freeze
 
+GOOD = "- profile: Default\n  match: []\n- profile: Profile 1\n  match: [github]\n"
+
 describe "pick_profile" do
   it "uses the first matching profile in list order" do
     assert_equal "Profile 1", pick_profile(RULES, "https://github.com/acme/repo")
@@ -23,8 +25,9 @@ describe "pick_profile" do
     assert_equal "Default", pick_profile(RULES, "https://news.example.org/a")
   end
 
-  it "matches a fragment in the fallback entry" do
-    assert_equal "Default", pick_profile(RULES, "https://fallback.example/x")
+  # The URL also contains "github", so only a real hit on the first entry gives Default.
+  it "lets a fragment in the fallback entry win over later entries" do
+    assert_equal "Default", pick_profile(RULES, "https://fallback.example/github")
   end
 
   it "ignores case in the URL and the fragment" do
@@ -67,7 +70,8 @@ describe "load_config" do
 
   it "returns the rules from a valid file" do
     cfg("- profile: Default\n  match: []\n- profile: Profile 1\n  match: [github]\n") do |p|
-      assert_equal "Profile 1", load_config(p).last["profile"]
+      assert_equal [{ "profile" => "Default", "match" => [] }, { "profile" => "Profile 1", "match" => ["github"] }],
+                   load_config(p)
     end
   end
 
@@ -131,8 +135,6 @@ describe "main" do
 
   after { $system_ok = true }
 
-  GOOD = "- profile: Default\n  match: []\n- profile: Profile 1\n  match: [github]\n"
-
   it "launches the chosen profile and logs the dispatch" do
     run_main("https://github.com/acme/r/pull/47", GOOD) do |calls, log, status|
       assert_nil status
@@ -175,6 +177,28 @@ describe "main" do
       end
     end
     assert_match(/cannot write log/, err)
+  end
+
+  it "refuses a missing URL argument" do
+    [[], [nil]].each do |argv|
+      Dir.mktmpdir do |d|
+        $calls.clear
+        e = assert_raises(SystemExit) { main(argv, config_path: "#{d}/c.yml", log_path: "#{d}/l.log") }
+        refute_equal 0, e.status
+        assert_empty $calls
+        assert_match(/ERROR not a web URL: nil/, File.read("#{d}/l.log"))
+      end
+    end
+  end
+
+  it "appends one log line for each link" do
+    Dir.mktmpdir do |d|
+      File.write(cp = "#{d}/c.yml", GOOD)
+      main(["https://github.com/a"], config_path: cp, log_path: "#{d}/l.log")
+      main(["https://example.com/b"], config_path: cp, log_path: "#{d}/l.log")
+      assert_equal ["Profile 1 https://github.com/a", "Default https://example.com/b"],
+                   File.readlines("#{d}/l.log", chomp: true).map { |l| l.split(" ", 2).last }
+    end
   end
 
   it "logs a missing config and still opens the link" do
