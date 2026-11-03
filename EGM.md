@@ -15,7 +15,7 @@ Read `.okf/index.md` for the knowledge bundle (dispatch rules, the app, decision
   - `web_url?(url)`: true only for a valid-UTF-8 String that starts with `http://` or `https://` and has no control character.
   - `launch_command(profile, url)`: argv for `system`. `nil` profile: no `--profile-directory` flag.
   - `main(argv, config_path:, log_path:)`: runs only when the file is the program (`__FILE__ == $0`), so tests can `load` it.
-- `bin/build [--install]` (bash): builds `build/my-choosy.app`. `RUBY` must be an absolute, executable path with no `"` or `\`, and must have `YAML.safe_load_file`.
+- `bin/build [--install]` (bash): builds `build/my-choosy.app`. The `Info.plist` declares URL types `http`/`https` and an HTML viewer document type. System Settings needs both to list the app (with stale copies removed). `RUBY` must be an absolute, executable path with no `"` or `\`, and must have `YAML.safe_load_file`.
 - `config.example.yml`: the config shape. The live config is `~/.config/my-choosy/config.yml`.
 
 ## Subdirectories & System Boundaries
@@ -39,6 +39,7 @@ Read `.okf/index.md` for the knowledge bundle (dispatch rules, the app, decision
 
 - `my-choosy` appends to `~/Library/Logs/my-choosy.log` and runs `open` for Google Chrome.
 - `bin/build` writes `build/`. With `--install` it writes `~/Applications/my-choosy.app` and the user LaunchServices database (`lsregister -f`).
+- macOS registers each built copy (for example `build/my-choosy.app`) with LaunchServices on its own. Extra copies with the bundle ID `local.my-choosy` can keep the app out of the System Settings browser list. Remove them with `lsregister -u <path>`.
 
 ## System Verification
 
