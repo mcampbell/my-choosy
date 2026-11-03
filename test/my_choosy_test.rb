@@ -143,6 +143,15 @@ describe "main" do
     end
   end
 
+  it "logs a failed launch and exits non-zero" do
+    $system_ok = nil # what Kernel#system returns when the command cannot run
+    run_main("https://github.com/acme/r", GOOD) do |_, log, status|
+      refute_nil status
+      refute_equal 0, status
+      assert_match(/ERROR open failed.* https:\/\/github.com\/acme\/r\n\z/, log)
+    end
+  end
+
   # The log path sits under a regular file, so the log write fails.
   it "still opens the link when the log cannot be written" do
     _, err = capture_io do

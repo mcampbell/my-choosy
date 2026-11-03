@@ -48,7 +48,10 @@ def main(argv, config_path: File.expand_path("~/.config/my-choosy/config.yml"),
     nil
   end
   log_line(log_path, profile, url) if profile
-  system(*launch_command(profile, url))
+  return if system(*launch_command(profile, url))
+
+  log_line(log_path, "ERROR open failed:", url)
+  exit 1
 end
 
 main(ARGV) if __FILE__ == $0
