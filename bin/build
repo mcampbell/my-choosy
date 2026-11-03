@@ -21,7 +21,7 @@ case "$RUBY" in
   *) echo "RUBY must be an absolute path (got: '$RUBY')" >&2; exit 1 ;;
 esac
 if ! "$RUBY" -ryaml -e 'exit(YAML.respond_to?(:safe_load_file))'; then
-  echo "$RUBY lacks YAML.safe_load_file (needs Ruby 3.0+ / Psych 3.3+). Set RUBY to a newer ruby." >&2
+  echo "$RUBY lacks YAML.safe_load_file. Set RUBY to a newer ruby." >&2
   exit 1
 fi
 echo "1. Done: $RUBY"
