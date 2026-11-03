@@ -79,23 +79,34 @@ describe "load_config" do
     assert_raises(StandardError) { load_config("/nonexistent/c.yml") }
   end
 
+  # Check the message: a NoMethodError from a missed check is also a StandardError.
+  def assert_invalid(y)
+    cfg(y) { |p| assert_match(/config must be/, assert_raises(RuntimeError, y) { load_config(p) }.message, y) }
+  end
+
   it "raises on a scalar, an empty list, and an entry without a profile" do
     ["just text", "[]", "- match: [a]\n", "- profile: A\n"].each do |y|
-      cfg(y) { |p| assert_raises(StandardError, y) { load_config(p) } }
+      assert_invalid(y)
     end
   end
 
-  it "raises on wrong types and malformed YAML" do
+  it "raises on wrong types" do
     ["- profile: A\n  match: github\n", "- profile: 1\n  match: [a]\n",
-     "- profile: A\n  match: [1]\n", "- profile: [A\n"].each do |y|
-      cfg(y) { |p| assert_raises(StandardError, y) { load_config(p) } }
-    end
+     "- profile: A\n  match: [1]\n"].each { |y| assert_invalid(y) }
+  end
+
+  it "raises on malformed YAML" do
+    cfg("- profile: [A\n") { |p| assert_raises(Psych::SyntaxError) { load_config(p) } }
+  end
+
+  it "raises when any one entry is invalid" do
+    assert_invalid("- profile: Default\n  match: []\n- profile: B\n  match: github\n")
   end
 
   # An empty fragment would match every URL; an empty profile gives Chrome a bad flag.
   it "raises on an empty profile or an empty fragment" do
     ["- profile: \"\"\n  match: []\n", "- profile: A\n  match: [\"\"]\n"].each do |y|
-      cfg(y) { |p| assert_raises(StandardError, y) { load_config(p) } }
+      assert_invalid(y)
     end
   end
 end
