@@ -15,7 +15,7 @@ Read `.okf/index.md` for the knowledge bundle (dispatch rules, the app, decision
   - `web_url?(url)`: true only for a valid-UTF-8 String that starts with `http://` or `https://` and has no control character.
   - `launch_command(profile, url)`: argv for `system`. `nil` profile: no `--profile-directory` flag.
   - `main(argv, config_path:, log_path:)`: runs only when the file is the program (`__FILE__ == $0`), so tests can `load` it.
-- `bin/build [--install]` (bash): builds `build/my-choosy.app`. The `Info.plist` declares URL types `http`/`https` and an HTML viewer document type. System Settings needs both to list the app (with stale copies removed). `RUBY` must be an absolute, executable path with no `"` or `\`, and must have `YAML.safe_load_file`.
+- `bin/build [--install]` (bash): builds `build/my-choosy.app`. The `Info.plist` declares URL types `http`/`https` and an HTML viewer document type. With URL types alone, System Settings did not list the app. `RUBY` must be an absolute, executable path with no `"` or `\`, and must have `YAML.safe_load_file`.
 - `config.example.yml`: the config shape. The live config is `~/.config/my-choosy/config.yml`.
 
 ## Subdirectories & System Boundaries
