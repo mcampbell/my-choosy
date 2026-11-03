@@ -16,6 +16,7 @@ fi
 echo "1. Checking Ruby"
 RUBY="${RUBY:-$(command -v ruby || true)}"
 case "$RUBY" in
+  *[\"\\]*) echo "RUBY must not contain a quote or backslash: it goes into AppleScript source (got: '$RUBY')" >&2; exit 1 ;;
   /*) ;;
   *) echo "RUBY must be an absolute path (got: '$RUBY')" >&2; exit 1 ;;
 esac
