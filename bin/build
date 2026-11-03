@@ -1,0 +1,71 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# 0. Args
+INSTALL=0
+if [ $# -gt 0 ]; then
+  if [ "$1" = "--install" ] && [ $# -eq 1 ]; then
+    INSTALL=1
+  else
+    echo "usage: bin/build [--install]" >&2
+    exit 2
+  fi
+fi
+
+# 1. Check Ruby
+echo "1. Checking Ruby"
+RUBY="${RUBY:-$(command -v ruby || true)}"
+case "$RUBY" in
+  /*) ;;
+  *) echo "RUBY must be an absolute path (got: '$RUBY')" >&2; exit 1 ;;
+esac
+if ! "$RUBY" -ryaml -e 'exit(YAML.respond_to?(:safe_load_file))'; then
+  echo "$RUBY lacks YAML.safe_load_file (needs Ruby 3.0+ / Psych 3.3+). Set RUBY to a newer ruby." >&2
+  exit 1
+fi
+echo "1. Done: $RUBY"
+
+# 2. Compile applet
+cd "$(dirname "$0")/.."
+echo "2. Compiling applet"
+rm -rf build/my-choosy.app
+mkdir -p build
+SCRIPT="$(mktemp)"
+trap 'rm -f "$SCRIPT"' EXIT
+cat > "$SCRIPT" <<APPLESCRIPT
+on open location theURL
+  do shell script quoted form of "$RUBY" & " " & quoted form of ((POSIX path of (path to me)) & "Contents/Resources/my-choosy") & " " & quoted form of theURL
+end open location
+APPLESCRIPT
+osacompile -o build/my-choosy.app "$SCRIPT"
+echo "2. Done"
+
+# 3. Bundle script
+echo "3. Copying my-choosy"
+cp my-choosy build/my-choosy.app/Contents/Resources/my-choosy
+chmod +x build/my-choosy.app/Contents/Resources/my-choosy
+echo "3. Done"
+
+# 4. Info.plist
+echo "4. Editing Info.plist"
+PLIST=build/my-choosy.app/Contents/Info.plist
+plutil -replace CFBundleIdentifier -string local.my-choosy "$PLIST"
+plutil -replace CFBundleURLTypes -json '[{"CFBundleURLName":"Web URL","CFBundleURLSchemes":["http","https"]}]' "$PLIST"
+plutil -replace LSUIElement -bool true "$PLIST"
+echo "4. Done"
+
+# 5. Sign
+echo "5. Signing"
+codesign --force --sign - build/my-choosy.app
+codesign --verify build/my-choosy.app
+echo "5. Done"
+
+# 6. Install
+if [ "$INSTALL" = 1 ]; then
+  echo "6. Installing"
+  mkdir -p ~/Applications
+  rm -rf ~/Applications/my-choosy.app
+  cp -R build/my-choosy.app ~/Applications/my-choosy.app
+  /System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister -f ~/Applications/my-choosy.app
+  echo "6. Done"
+fi
