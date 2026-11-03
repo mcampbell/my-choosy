@@ -41,6 +41,8 @@ cp config.example.yml ~/.config/my-choosy/config.yml
 - **The first profile in the list is the fallback.** A URL that matches no
   fragment opens in it.
 - The first match wins. The script checks the profiles in list order.
+- Each `profile` and each fragment must not be empty. An empty fragment
+  would match every URL.
 - If the config is missing or invalid, the script logs the error and opens
   the link in Chrome with no profile flag. Chrome then uses its last-used
   profile.
@@ -124,5 +126,9 @@ ruby test/my_choosy_test.rb
 
 - **A link opens in the wrong profile:** check that `profile` is the folder
   name, not the display name. Check the fragment order: the first match wins.
-- **Nothing opens:** look for `ERROR` in the log. A URL that does not start
-  with `http://` or `https://` opens nothing.
+- **Nothing opens:** look for `ERROR` in the log.
+  - `ERROR not a web URL:` - the URL does not start with `http://` or
+    `https://`, or it has a control character (newline, tab). The script
+    opens nothing.
+  - `ERROR open failed:` - the `open` command failed. Check that Google
+    Chrome is in `/Applications`.
