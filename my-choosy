@@ -1,0 +1,52 @@
+#!/usr/bin/env ruby
+require "yaml"
+require "time"
+require "fileutils"
+
+def load_config(path)
+  rules = YAML.safe_load_file(path)
+  ok = rules.is_a?(Array) && !rules.empty? && rules.all? do |r|
+    r.is_a?(Hash) && r["profile"].is_a?(String) &&
+      r["match"].is_a?(Array) && r["match"].all?(String)
+  end
+  raise "config must be a non-empty list of {profile: String, match: [String]}" unless ok
+  rules
+end
+
+def pick_profile(rules, url)
+  hit = rules.find { |r| r["match"].any? { |f| url.downcase.include?(f.downcase) } }
+  (hit || rules.first)["profile"]
+end
+
+def web_url?(url)
+  url.to_s.match?(%r{\Ahttps?://}i)
+end
+
+def launch_command(profile, url)
+  return ["open", "-a", "Google Chrome", url] unless profile
+  ["open", "-na", "Google Chrome", "--args", "--profile-directory=#{profile}", url]
+end
+
+def log_line(log_path, what, url)
+  FileUtils.mkdir_p(File.dirname(log_path))
+  File.open(log_path, "a") { |f| f.puts "#{Time.now.iso8601} #{what} #{url}" }
+end
+
+def main(argv, config_path: File.expand_path("~/.config/my-choosy/config.yml"),
+         log_path: File.expand_path("~/Library/Logs/my-choosy.log"))
+  url = argv[0]
+  unless web_url?(url)
+    log_line(log_path, "ERROR not a web URL:", url.inspect)
+    exit 1
+  end
+  profile = begin
+    pick_profile(load_config(config_path), url)
+  rescue StandardError => e
+    log_line(log_path, "ERROR #{e.message.tr("\n", " ")}", url)
+    nil
+  end
+  log_line(log_path, profile, url) if profile
+  system(*launch_command(profile, url))
+end
+
+main(ARGV) if __FILE__ == $0
