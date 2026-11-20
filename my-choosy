@@ -14,43 +14,50 @@ def load_config(path)
 end
 
 def pick_profile(rules, url)
-  hit = rules.find { |r| r["match"].any? { |f| url.downcase.include?(f.downcase) } }
-  (hit || rules.first)["profile"]
+  rules.each do |r|
+    hit = r["match"].find { |f| url.downcase.include?(f.downcase) }
+    return [r["profile"], "matched #{hit}"] if hit
+  end
+  [rules.first["profile"], "no match, first entry"]
 end
 
 def web_url?(url)
   url.is_a?(String) && url.valid_encoding? && url.match?(%r{\Ahttps?://[^[:cntrl:]]+\z}i)
 end
 
+BROWSER = "Google Chrome"
+
 def launch_command(profile, url)
-  return ["open", "-a", "Google Chrome", url] unless profile
-  ["open", "-na", "Google Chrome", "--args", "--profile-directory=#{profile}", url]
+  return ["open", "-a", BROWSER, url] unless profile
+  ["open", "-na", BROWSER, "--args", "--profile-directory=#{profile}", url]
 end
 
-def log_line(log_path, what, url)
+# logfmt. inspect quotes each value and escapes control bytes, so no input can forge a line.
+def log_line(log_path, level, **fields)
   FileUtils.mkdir_p(File.dirname(log_path))
-  File.open(log_path, "a") { |f| f.puts "#{Time.now.iso8601} #{what} #{url}" }
+  pairs = fields.map { |k, v| "#{k}=#{v.inspect}" }.join(" ")
+  File.open(log_path, "a") { |f| f.puts "#{Time.now.iso8601} level=#{level} #{pairs}" }
 rescue SystemCallError => e
   warn "my-choosy: cannot write log: #{e.message}" # a log failure must not lose the link
 end
 
 def main(argv, config_path: File.expand_path("~/.config/my-choosy/config.yml"),
-         log_path: File.expand_path("~/Library/Logs/my-choosy.log"))
+         log_path: File.expand_path("~/logs/my-choosy.log"))
   url = argv[0]
   unless web_url?(url)
-    log_line(log_path, "ERROR not a web URL:", url.inspect)
+    log_line(log_path, "ERROR", input: url, reason: "not a web URL")
     exit 1
   end
-  profile = begin
+  profile, reason = begin
     pick_profile(load_config(config_path), url)
   rescue StandardError => e
-    log_line(log_path, "ERROR #{e.message.tr("\n", " ")}", url)
-    nil
+    [nil, "config error, no profile: #{e.message}"]
   end
-  log_line(log_path, profile, url) if profile
+  fields = { input: url, browser: BROWSER, profile: profile }.compact
+  log_line(log_path, profile ? "INFO" : "ERROR", **fields, reason: reason)
   return if system(*launch_command(profile, url))
 
-  log_line(log_path, "ERROR open failed:", url)
+  log_line(log_path, "ERROR", **fields, reason: "open failed")
   exit 1
 end
 

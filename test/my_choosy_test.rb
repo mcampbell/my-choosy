@@ -18,26 +18,26 @@ GOOD = "- profile: Default\n  match: []\n- profile: Profile 1\n  match: [github]
 
 describe "pick_profile" do
   it "uses the first matching profile in list order" do
-    assert_equal "Profile 1", pick_profile(RULES, "https://github.com/acme/repo")
+    assert_equal ["Profile 1", "matched github"], pick_profile(RULES, "https://github.com/acme/repo")
   end
 
   it "falls back to the first profile when nothing matches" do
-    assert_equal "Default", pick_profile(RULES, "https://news.example.org/a")
+    assert_equal ["Default", "no match, first entry"], pick_profile(RULES, "https://news.example.org/a")
   end
 
   # The URL also contains "github", so only a real hit on the first entry gives Default.
   it "lets a fragment in the fallback entry win over later entries" do
-    assert_equal "Default", pick_profile(RULES, "https://fallback.example/github")
+    assert_equal ["Default", "matched Fallback.example"], pick_profile(RULES, "https://fallback.example/github")
   end
 
   it "ignores case in the URL and the fragment" do
-    assert_equal "Profile 1", pick_profile(RULES, "https://GitHub.com/x")
-    assert_equal "Profile 1", pick_profile([RULES[0], { "profile" => "Profile 1", "match" => ["GITHUB"] }], "https://github.com")
+    assert_equal "Profile 1", pick_profile(RULES, "https://GitHub.com/x").first
+    assert_equal "Profile 1", pick_profile([RULES[0], { "profile" => "Profile 1", "match" => ["GITHUB"] }], "https://github.com").first
   end
 
   it "matches a fragment in the path or query" do
-    assert_equal "Profile 1", pick_profile(RULES, "https://example.com/go?to=atlassian.net/wiki")
-    assert_equal "Profile 2", pick_profile([RULES[0], RULES[2]], "https://example.com/r/docs.google/d/37")
+    assert_equal ["Profile 1", "matched atlassian.net"], pick_profile(RULES, "https://example.com/go?to=atlassian.net/wiki")
+    assert_equal "Profile 2", pick_profile([RULES[0], RULES[2]], "https://example.com/r/docs.google/d/37").first
   end
 end
 
@@ -150,7 +150,7 @@ describe "main" do
     run_main("https://github.com/acme/r/pull/47", GOOD) do |calls, log, status|
       assert_nil status
       assert_equal [launch_command("Profile 1", "https://github.com/acme/r/pull/47")], calls
-      assert_match(/\A\d{4}-\d\d-\d\dT\S+ Profile 1 https:\/\/github.com\/acme\/r\/pull\/47\n\z/, log)
+      assert_match(/\A\d{4}-\d\d-\d\dT\S+ level=INFO input="https:\/\/github.com\/acme\/r\/pull\/47" browser="Google Chrome" profile="Profile 1" reason="matched github"\n\z/, log)
     end
   end
 
@@ -159,14 +159,14 @@ describe "main" do
       assert_empty calls
       refute_equal 0, status
       refute_nil status
-      assert_match(/ERROR .*file:\/\/\/etc\/passwd/, log)
+      assert_match(/ level=ERROR input="file:\/\/\/etc\/passwd" reason="not a web URL"\n\z/, log)
     end
   end
 
   it "logs a bad config and still opens the link with no profile" do
     run_main("https://example.com/p?q=89", "just text") do |calls, log, _|
       assert_equal [launch_command(nil, "https://example.com/p?q=89")], calls
-      assert_match(/ERROR .* https:\/\/example.com\/p\?q=89\n\z/, log)
+      assert_match(/ level=ERROR input="https:\/\/example.com\/p\?q=89" browser="Google Chrome" reason="config error, no profile: config must be .*"\n\z/, log)
     end
   end
 
@@ -175,7 +175,7 @@ describe "main" do
     run_main("https://github.com/acme/r", GOOD) do |_, log, status|
       refute_nil status
       refute_equal 0, status
-      assert_match(/ERROR open failed.* https:\/\/github.com\/acme\/r\n\z/, log)
+      assert_match(/ level=ERROR input="https:\/\/github.com\/acme\/r" browser="Google Chrome" profile="Profile 1" reason="open failed"\n\z/, log)
     end
   end
 
@@ -197,7 +197,7 @@ describe "main" do
         e = assert_raises(SystemExit) { main(argv, config_path: "#{d}/c.yml", log_path: "#{d}/l.log") }
         refute_equal 0, e.status
         assert_empty $calls
-        assert_match(/ERROR not a web URL: nil/, File.read("#{d}/l.log"))
+        assert_match(/ level=ERROR input=nil reason="not a web URL"/, File.read("#{d}/l.log"))
       end
     end
   end
@@ -207,8 +207,16 @@ describe "main" do
       File.write(cp = "#{d}/c.yml", GOOD)
       main(["https://github.com/a"], config_path: cp, log_path: "#{d}/l.log")
       main(["https://example.com/b"], config_path: cp, log_path: "#{d}/l.log")
-      assert_equal ["Profile 1 https://github.com/a", "Default https://example.com/b"],
+      assert_equal ['level=INFO input="https://github.com/a" browser="Google Chrome" profile="Profile 1" reason="matched github"',
+                    'level=INFO input="https://example.com/b" browser="Google Chrome" profile="Default" reason="no match, first entry"'],
                    File.readlines("#{d}/l.log", chomp: true).map { |l| l.split(" ", 2).last }
+    end
+  end
+
+  it "escapes a newline in the input, so the log gets one line" do
+    run_main("https://a.example\n2026-01-01T00:00:00+00:00 level=INFO input=\"https://evil.example\"", GOOD) do |_, log, _|
+      assert_equal 1, log.lines.size
+      assert_includes log, 'input="https://a.example\\n2026'
     end
   end
 
