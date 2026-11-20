@@ -104,15 +104,21 @@ ruby test/my_choosy_test.rb
 
    ```sh
    open https://github.com
-   tail -1 ~/Library/Logs/my-choosy.log
+   tail -1 ~/logs/my-choosy.log
    ```
 
-   The log line shows the profile that the script picked.
+   The log line shows the input URL, the browser, the profile that the
+   script picked, and the reason (the fragment that matched, or the fallback).
 
 ## Troubleshoot
 
-- **Log:** `~/Library/Logs/my-choosy.log`. The script writes one line for
-  each link and each error.
+- **Log:** `~/logs/my-choosy.log`, in logfmt. The script writes one line for
+  each link and each error:
+
+  ```text
+  2026-11-20T10:15:02-05:00 level=INFO input="https://github.com/acme/r" browser="Google Chrome" profile="Profile 1" reason="matched github"
+  ```
+
 - **The app is not in the System Settings list:** run `bin/build --install`
   again. It runs `lsregister -f`. Then remove other registered copies of the
   app, for example `build/my-choosy.app`:
@@ -133,9 +139,9 @@ ruby test/my_choosy_test.rb
 
 - **A link opens in the wrong profile:** check that `profile` is the folder
   name, not the display name. Check the fragment order: the first match wins.
-- **Nothing opens:** look for `ERROR` in the log.
-  - `ERROR not a web URL:` - the URL does not start with `http://` or
+- **Nothing opens:** look for `level=ERROR` in the log.
+  - `reason="not a web URL"` - the URL does not start with `http://` or
     `https://`, or it has a control character (newline, tab). The script
     opens nothing.
-  - `ERROR open failed:` - the `open` command failed. Check that Google
+  - `reason="open failed"` - the `open` command failed. Check that Google
     Chrome is in `/Applications`.

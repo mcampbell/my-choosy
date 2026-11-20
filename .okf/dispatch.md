@@ -13,16 +13,16 @@ sources:
 
 # Behavior
 
-1. `web_url?`: accept only a valid-UTF-8 string that starts with `http://` or `https://` (any case) and has no control character. Else log `ERROR not a web URL:` and exit 1. Nothing opens.[^script]
+1. `web_url?`: accept only a valid-UTF-8 string that starts with `http://` or `https://` (any case) and has no control character. Else log `level=ERROR` with `reason="not a web URL"` and exit 1. Nothing opens.[^script]
 2. `load_config`: `YAML.safe_load_file` on each run (no cache). It must be a non-empty list of `{profile: String, match: [String]}`, with no empty profile or fragment.
-3. `pick_profile`: check entries in list order, fragments in list order. A fragment matches if the full URL contains it, ignoring case. First hit wins. No hit: the first entry (the fallback).
+3. `pick_profile`: check entries in list order, fragments in list order. A fragment matches if the full URL contains it, ignoring case. First hit wins. No hit: the first entry (the fallback). It returns `[profile, reason]`: `matched <fragment>` or `no match, first entry`.
 4. `launch_command`: `open -na "Google Chrome" --args --profile-directory=<profile> <url>`, run with `system(*cmd)` (no shell).
 5. A bad config logs the error and opens `open -a "Google Chrome" <url>` with no profile flag.
-6. A failed `open` logs `ERROR open failed:` and exits 1.
+6. A failed `open` logs `reason="open failed"` and exits 1.
 
 # Log
 
-`~/Library/Logs/my-choosy.log`: one line per dispatch (`<iso8601> <profile> <url>`) and per error. A log write failure goes to stderr and does not stop the launch.
+`~/logs/my-choosy.log`, logfmt: one line per dispatch and per error, `<iso8601> level=<INFO|ERROR> input=<url> browser=<app> profile=<folder> reason=<why>`. `inspect` quotes each value, so a control byte in the input cannot forge a line. A bad config omits `profile`. A log write failure goes to stderr and does not stop the launch.
 
 See [decisions](/decisions/index.md).
 
