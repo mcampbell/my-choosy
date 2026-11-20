@@ -1,0 +1,16 @@
+# Copy to ~/.config/my-choosy/config.yml.
+#
+# profile: the Chrome profile folder name (see README), not the display name.
+# match:   URL fragments. A URL matches if it contains the fragment anywhere.
+#          The match ignores case.
+#
+# The first profile is the fallback for URLs that match no fragment.
+# The first match wins, in list order.
+
+- profile: Default
+  match: []
+
+- profile: Profile 1
+  match:
+    - github
+    - atlassian.net
