@@ -1,0 +1,64 @@
+#!/usr/bin/env ruby
+require "yaml"
+require "time"
+require "fileutils"
+
+def load_config(path)
+  rules = YAML.safe_load_file(path)
+  ok = rules.is_a?(Array) && !rules.empty? && rules.all? do |r|
+    r.is_a?(Hash) && r["profile"].is_a?(String) && !r["profile"].empty? &&
+      r["match"].is_a?(Array) && r["match"].all? { |f| f.is_a?(String) && !f.empty? }
+  end
+  raise "config must be a non-empty list of {profile: String, match: [String]}" unless ok
+  rules
+end
+
+def pick_profile(rules, url)
+  rules.each do |r|
+    hit = r["match"].find { |f| url.downcase.include?(f.downcase) }
+    return [r["profile"], "matched #{hit}"] if hit
+  end
+  [rules.first["profile"], "no match, first entry"]
+end
+
+def web_url?(url)
+  url.is_a?(String) && url.valid_encoding? && url.match?(%r{\Ahttps?://[^[:cntrl:]]+\z}i)
+end
+
+BROWSER = "Google Chrome"
+
+def launch_command(profile, url)
+  return ["open", "-a", BROWSER, url] unless profile
+  ["open", "-na", BROWSER, "--args", "--profile-directory=#{profile}", url]
+end
+
+# logfmt. inspect quotes each value and escapes control bytes, so no input can forge a line.
+def log_line(log_path, level, **fields)
+  FileUtils.mkdir_p(File.dirname(log_path))
+  pairs = fields.map { |k, v| "#{k}=#{v.inspect}" }.join(" ")
+  File.open(log_path, "a") { |f| f.puts "#{Time.now.iso8601} level=#{level} #{pairs}" }
+rescue SystemCallError => e
+  warn "my-choosy: cannot write log: #{e.message}" # a log failure must not lose the link
+end
+
+def main(argv, config_path: File.expand_path("~/.config/my-choosy/config.yml"),
+         log_path: File.expand_path("~/logs/my-choosy.log"))
+  url = argv[0]
+  unless web_url?(url)
+    log_line(log_path, "ERROR", input: url, reason: "not a web URL")
+    exit 1
+  end
+  profile, reason = begin
+    pick_profile(load_config(config_path), url)
+  rescue StandardError => e
+    [nil, "config error, no profile: #{e.message}"]
+  end
+  fields = { input: url, browser: BROWSER, profile: profile }.compact
+  log_line(log_path, profile ? "INFO" : "ERROR", **fields, reason: reason)
+  return if system(*launch_command(profile, url))
+
+  log_line(log_path, "ERROR", **fields, reason: "open failed")
+  exit 1
+end
+
+main(ARGV) if __FILE__ == $0
